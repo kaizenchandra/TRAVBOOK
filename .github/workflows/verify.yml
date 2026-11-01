@@ -72,6 +72,7 @@ jobs:
       - run: npm run test:e2e
         env:
           DEMO_APIS_ENABLED: 'true'
+          NOTIFICATION_WORKER_ENABLED: 'true'
       - run: docker compose stop identity
         if: always()
       - uses: actions/upload-artifact@v4

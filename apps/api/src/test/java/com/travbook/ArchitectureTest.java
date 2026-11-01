@@ -6,6 +6,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 @AnalyzeClasses(packages="com.travbook",importOptions=ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
+    @ArchTest static final ArchRule notificationBoundaries=noClasses().that().resideInAPackage("..notifications..").should().dependOnClassesThat().resideInAnyPackage("..booking..","..stays..","..railtickets..","..journeys..","..flightprovider..","..payments..","..customer.adapter..","..customer.config..","..customer.application.usecase..","..customer.application.port.out..");
     @ArchTest static final ArchRule promotionBoundaries=noClasses().that().resideInAPackage("..flightprovider..").should().dependOnClassesThat().resideInAnyPackage("..offers.adapter..","..offers.config..","..offers.application.usecase..","..offers.application.port.out..");
     @ArchTest static final ArchRule couponsDoNotReachBackIntoBooking=noClasses().that().resideInAPackage("..offers..").should().dependOnClassesThat().resideInAnyPackage("..flightprovider..","..booking..","..pricing..","..payments..");
     @ArchTest static final ArchRule fictionalFlightProviderIsIsolated=noClasses().that().resideInAPackage("..flightprovider..").should().dependOnClassesThat()

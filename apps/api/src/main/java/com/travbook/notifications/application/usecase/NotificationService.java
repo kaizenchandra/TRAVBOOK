@@ -13,7 +13,7 @@ public final class NotificationService implements Notifications,ProcessNotificat
     public Page list(CustomerIdentity identity,UUID after){return store.list(customers.resolve(identity).id(),after);}
     public Notice read(CustomerIdentity identity,UUID id){return store.read(customers.resolve(identity).id(),id,clock.instant());}
     public void accept(LifecycleSignal signal){var preferences=organizer.preferences(signal.owner());store.accept(signal,preferences.email(),preferences.sms(),clock.instant());}
-    public int relay(){int count=0;RuntimeException last=null;for(var source:sources)try{for(var signal:source.pending()){accept(signal);source.acknowledge(signal.eventId());count++;}}catch(RuntimeException error){last=error;}if(last!=null)throw last;return count;}
+    public int relay(){int count=0;RuntimeException last=null;for(var source:sources)try{for(var signal:source.pending())try{accept(signal);source.acknowledge(signal.eventId());count++;}catch(RuntimeException failure){source.failed(signal.eventId());last=failure;}}catch(RuntimeException error){last=error;}if(last!=null)throw last;return count;}
     public boolean deliver(){var claim=store.claim(clock.instant());if(claim.isEmpty())return false;var c=claim.get();var d=c.delivery();
         try{var receipt=gateway.lookup(d);if(receipt.isPresent()){store.complete(c,d.completed(Delivery.State.SIMULATED_DELIVERED,receipt.get(),clock.instant()),clock.instant());return true;}
             var p=organizer.preferences(d.owner());if(!(d.channel()==Delivery.Channel.EMAIL?p.email():p.sms())){store.complete(c,d.completed(Delivery.State.SUPPRESSED,null,clock.instant()),clock.instant());return true;}

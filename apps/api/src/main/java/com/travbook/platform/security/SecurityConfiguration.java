@@ -45,8 +45,8 @@ public class SecurityConfiguration {
                 .ignoringRequestMatchers("/api/v1/trains/search","/api/v1/buses/search","/api/v1/buses/trips/*/reprice","/api/v1/cabs/search","/api/v1/cabs/offers/*/reprice")
                 .ignoringRequestMatchers(r->r.getHeader("Authorization")!=null && r.getHeader("Authorization").regionMatches(true,0,"Bearer ",0,7)))
             .authorizeHttpRequests(a->a
-                .requestMatchers(HttpMethod.GET,"/api/v1/me/notifications").authenticated()
-                .requestMatchers(HttpMethod.PUT,"/api/v1/me/notifications/*/read").authenticated()
+                .requestMatchers(HttpMethod.GET,"/api/v1/me/notifications").hasAuthority("SCOPE_bookings:read")
+                .requestMatchers(HttpMethod.PUT,"/api/v1/me/notifications/*/read").hasAuthority("SCOPE_bookings:read")
                 .requestMatchers(HttpMethod.GET,"/api/v1/coupons","/api/v1/demo/flight-provider/quotes/*/promotion").hasAuthority("SCOPE_bookings:read")
                 .requestMatchers(HttpMethod.POST,"/api/v2/demo/flight-provider/quotes").hasAuthority("SCOPE_bookings:write")
                 .requestMatchers(HttpMethod.GET,"/api/v1/demo/flight-provider/reservations").hasAuthority("SCOPE_bookings:read")

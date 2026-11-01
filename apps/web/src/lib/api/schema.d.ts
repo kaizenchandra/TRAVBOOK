@@ -3280,7 +3280,7 @@ export interface paths {
         };
         /**
          * List owned lifecycle notices and mock channel delivery status
-         * @description Authenticated owned notifications. In-app lifecycle notices are mandatory; optional email/SMS follows saved preferences at enqueue and again before provider dispatch. Delivery is MOCK only, durable provider receipts, bounded retry and reconciliation; no real email/SMS or recipients are contacted. Content contains only safe booking reference/status, not traveller names, contact or card data. V1 templates, event deduplication and aggregate-version guards. No-store/correlation IDs/problem+json. List newest first,20-item owned cursor. Read markers are idempotent, immutable first-read time and cookie CSRF protected. Enabling notifications does not backfill email/SMS for existing history.
+         * @description Requires bookings:read scope. Authenticated owned notifications. In-app lifecycle notices are mandatory; optional email/SMS follows saved preferences at enqueue and again before provider dispatch. Delivery is MOCK only, durable provider receipts, bounded retry and reconciliation; no real email/SMS or recipients are contacted. Content contains only safe booking reference/status, not traveller names, contact or card data. V1 templates, event deduplication and aggregate-version guards. No-store/correlation IDs/problem+json. List newest first,20-item owned cursor. Read markers are idempotent, immutable first-read time and cookie CSRF protected. Enabling notifications does not backfill email/SMS for existing history.
          */
         get: operations["getCustomerNotifications"];
         put?: never;
@@ -3301,7 +3301,7 @@ export interface paths {
         get?: never;
         /**
          * Mark an owned notification read idempotently
-         * @description Authenticated owned notifications. In-app lifecycle notices are mandatory; optional email/SMS follows saved preferences at enqueue and again before provider dispatch. Delivery is MOCK only, durable provider receipts, bounded retry and reconciliation; no real email/SMS or recipients are contacted. Content contains only safe booking reference/status, not traveller names, contact or card data. V1 templates, event deduplication and aggregate-version guards. No-store/correlation IDs/problem+json. List newest first,20-item owned cursor. Read markers are idempotent, immutable first-read time and cookie CSRF protected. Enabling notifications does not backfill email/SMS for existing history.
+         * @description Requires bookings:read scope. Authenticated owned notifications. In-app lifecycle notices are mandatory; optional email/SMS follows saved preferences at enqueue and again before provider dispatch. Delivery is MOCK only, durable provider receipts, bounded retry and reconciliation; no real email/SMS or recipients are contacted. Content contains only safe booking reference/status, not traveller names, contact or card data. V1 templates, event deduplication and aggregate-version guards. No-store/correlation IDs/problem+json. List newest first,20-item owned cursor. Read markers are idempotent, immutable first-read time and cookie CSRF protected. Enabling notifications does not backfill email/SMS for existing history.
          */
         put: operations["readCustomerNotification"];
         post?: never;
