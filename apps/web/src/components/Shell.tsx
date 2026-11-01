@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import { Compass, Plane, ShieldCheck, Armchair, BriefcaseBusiness, UserRound,Hotel,TrainFront,BusFront,Palmtree,Car,Heart,ChevronRight } from "lucide-react";
+import { Compass, Plane, ShieldCheck, Armchair, BriefcaseBusiness, UserRound,Hotel,TrainFront,BusFront,Palmtree,Car,Heart,ChevronRight,Bell } from "lucide-react";
 const services=[{name:"Flights",label:"Explore flights",href:"/",icon:Plane},{name:"Hotels",href:"/hotels",icon:Hotel},{name:"Trains",href:"/trains",icon:TrainFront},{name:"Buses",href:"/buses",icon:BusFront},{name:"Holidays",href:"/holidays",icon:Palmtree},{name:"Cabs",href:"/cabs",icon:Car},{name:"Seats & extras",href:"/flight-services",icon:Armchair}];
 export function Shell({children}:{children:React.ReactNode}) {
   const path=usePathname();
@@ -10,7 +10,7 @@ export function Shell({children}:{children:React.ReactNode}) {
     <a className="skip-link" href="#main">Skip to main content</a>
     <header className="site-header"><div className="container header-row">
       <Link href="/" className="brand" aria-label="Travbook home"><span className="brand-mark"><Compass size={25}/></span>travbook<span className="brand-dot">.</span></Link>
-      <div className="utility-links"><Link className="utility-link" href="/account/travel"><Heart size={24}/><span><strong>Saved travel</strong><small>Your favourites & travellers</small></span></Link><Link className="utility-link" href="/trips" aria-label="My Trips"><BriefcaseBusiness size={24}/><span><strong>My Trips</strong><small>Manage your bookings</small></span></Link></div>
+      <div className="utility-links"><Link className="utility-link" href="/notifications"><Bell size={24}/><span><strong>Notifications</strong><small>Booking updates</small></span></Link><Link className="utility-link" href="/account/travel"><Heart size={24}/><span><strong>Saved travel</strong><small>Your favourites & travellers</small></span></Link><Link className="utility-link" href="/trips" aria-label="My Trips"><BriefcaseBusiness size={24}/><span><strong>My Trips</strong><small>Manage your bookings</small></span></Link></div>
       <Link className="account-link" href="/account" aria-label="Login / My account"><UserRound size={19}/><span>Login / My account</span><ChevronRight size={15}/></Link>
       <span className="market-label">INDIA <span>•</span> INR</span>
     </div></header>

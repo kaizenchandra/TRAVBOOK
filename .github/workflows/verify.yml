@@ -121,6 +121,8 @@ jobs:
         run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from journey_care_outbox order by aggregate_id,aggregate_version" | node scripts/validate-journey-care-events.mjs
       - name: Validate local simulation event envelopes
         run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from demo_event order by operation_id,version" | node scripts/validate-simulation-events.mjs
+      - name: Validate committed coupon redemption events
+        run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from coupon_outbox order by id" | node scripts/validate-coupon-events.mjs
       - run: node scripts/verify-compose-recovery.mjs
       - run: docker compose stop
         if: always()
