@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: travbook-api
+  session:
+    timeout: 15m
+    jdbc:
+      initialize-schema: never
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:54329/travbook}
+    username: ${DATABASE_USERNAME:travbook}
+    password: ${DATABASE_PASSWORD:local-only-travbook}
+    hikari:
+      maximum-pool-size: 8
+      connection-timeout: 3000
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+      fail-on-null-for-primitives: true
+      fail-on-missing-creator-properties: true
+  threads:
+    virtual:
+      enabled: false
+server:
+  address: ${BIND_ADDRESS:127.0.0.1}
+  port: 8080
+  shutdown: graceful
+  tomcat:
+    max-http-form-post-size: 16KB
+  servlet:
+    session:
+      cookie:
+        name: TRAVBOOK_SESSION
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: lax
+  error:
+    include-message: never
+    include-stacktrace: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+travbook:
+  notifications:
+    worker-enabled: ${NOTIFICATION_WORKER_ENABLED:false}
+    poll-ms: ${NOTIFICATION_POLL_MS:2000}
+  demo:
+    enabled: ${DEMO_APIS_ENABLED:false}
+    worker-enabled: ${DEMO_WORKER_ENABLED:true}
+    poll-ms: ${DEMO_POLL_MS:1000}
+  integration-mode: ${INTEGRATION_MODE:MOCK}
+  oidc-issuer: ${OIDC_ISSUER:}
+  oidc-audience: ${OIDC_AUDIENCE:travbook-api}
+  login-enabled: ${OIDC_LOGIN_ENABLED:false}
+  local-identity: false
+  web-origin: ${WEB_ORIGIN:http://127.0.0.1:3000}
+  search-budget-ms: 1500
+  booking:
+    cancellation-enabled: ${BOOKING_CANCELLATION_ENABLED:true}
+    checkout-enabled: ${BOOKING_CHECKOUT_ENABLED:true}
+    checkout-poll-ms: 300
+    events-enabled: ${BOOKING_EVENTS_ENABLED:true}
+    events-poll-ms: 250
+    worker-enabled: ${BOOKING_WORKER_ENABLED:true}
+    poll-ms: 500
+    lease-seconds: 15
+    max-attempts: 4
+  payments:
+    refund-worker-enabled: ${REFUND_WORKER_ENABLED:true}
+

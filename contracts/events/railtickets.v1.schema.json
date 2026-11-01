@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rail lifecycle event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "aggregateId",
+    "aggregateVersion",
+    "eventType",
+    "schemaVersion",
+    "producer",
+    "mode",
+    "occurredAt",
+    "correlationId",
+    "causationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eventType": {
+      "enum": [
+        "RailQuoteCreated",
+        "RailQuoteAccepted",
+        "RailBookingCreated",
+        "RailCancellationRequested",
+        "RailTicketIssued",
+        "RailRefundCompleted",
+        "RailBookingCancelled",
+        "RailBookingFailed",
+        "RailReconciliationRequired",
+        "RailWorkflowProgressed",
+        "RailVoucherCreated",
+        "RailReconciliationResumed",
+        "RailPassengersCancelled",
+        "RailLegacyOutcomeReconciled"
+      ]
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "railtickets"
+    },
+    "mode": {
+      "const": "MOCK"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "payment",
+        "reservation",
+        "refund"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "CREATED",
+            "ACCEPTED",
+            "PROCESSING",
+            "ISSUED",
+            "FAILED",
+            "CANCELLATION_PENDING",
+            "CANCELLED",
+            "REVIEW"
+          ]
+        },
+        "payment": {
+          "enum": [
+            "N/A",
+            "NOT_STARTED",
+            "AUTHORIZED",
+            "CAPTURED",
+            "DECLINED",
+            "VOIDED"
+          ]
+        },
+        "reservation": {
+          "enum": [
+            "N/A",
+            "NOT_STARTED",
+            "CONFIRMED",
+            "REJECTED",
+            "CANCELLED",
+            "RAC",
+            "WAITLIST"
+          ]
+        },
+        "refund": {
+          "enum": [
+            "N/A",
+            "NONE",
+            "PENDING",
+            "SUCCEEDED",
+            "NOT_DUE"
+          ]
+        }
+      }
+    }
+  }
+}

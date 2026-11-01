@@ -1,0 +1,133 @@
+name: Verify travel discovery, identity, durable bookings and MOCK checkout
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.0
+      - run: terraform -chdir=infra/aws init -backend=false -input=false
+      - run: terraform -chdir=infra/aws fmt -check -recursive
+      - run: terraform -chdir=infra/aws validate
+      - run: terraform -chdir=infra/aws test
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_DB: travbook
+          POSTGRES_USER: travbook
+          POSTGRES_PASSWORD: local-only-travbook
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U travbook -d travbook"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
+      - run: npm run requirements:check
+      - run: npm run requirements:test
+      - run: npm run contract:lint
+      - run: npm run contract:check
+      - run: npm run contract:test
+      - name: Check compatibility with pull request base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git cat-file -e "$BASE_SHA:contracts/openapi.json" 2>/dev/null; then
+            git show "$BASE_SHA:contracts/openapi.json" > "$RUNNER_TEMP/base.openapi.json"
+            node scripts/contract-compatibility.mjs "$RUNNER_TEMP/base.openapi.json"
+          else
+            echo "Initial contract: base branch has no OpenAPI document."
+          fi
+      - run: sh scripts/maven.sh -f apps/api/pom.xml verify -B
+      - run: node scripts/validate-flight-provider-contracts.mjs apps/api/target/flight-provider-http.jsonl apps/api/target/flight-provider-events.jsonl
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm exec -- playwright install --with-deps chromium
+      - run: docker compose up -d --wait identity
+      - run: npm run test:e2e
+        env:
+          DEMO_APIS_ENABLED: 'true'
+      - run: docker compose stop identity
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-evidence
+          path: |
+            apps/api/target/surefire-reports/
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+  compose:
+    needs: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm exec -- playwright install --with-deps chromium
+      - run: docker compose config --quiet
+      - run: docker compose build backend frontend
+      - run: docker compose up -d --wait --wait-timeout 180
+      - run: npm run test:e2e
+        env:
+          PLAYWRIGHT_EXTERNAL_SERVERS: '1'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify operator UI against isolated signed-identity API
+        run: sh scripts/maven.sh -f apps/api/pom.xml '-Dtest=OpsBrowserIT#desktopAndMobileUseRealMfaClaimProtectedApi+desktopAndMobileReconcileProvenLegacyOutcomes' test
+      - name: Verify journey operator recovery against isolated signed-identity API
+        run: sh scripts/maven.sh -f apps/api/pom.xml -Dtest=JourneyOpsBrowserIT#desktopAndMobileRecoverAllJourneyKinds test
+      - name: Verify partial cancellation operator recovery
+        run: sh scripts/maven.sh -f apps/api/pom.xml -Dtest=AdvancedJourneyOpsBrowserIT#desktopAndMobileRecoverPartialCancellation test
+      - name: Validate committed rail event envelopes
+        run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from rail_ticket_outbox order by created_at,id" | node scripts/validate-rail-events.mjs
+      - name: Validate committed journey event envelopes
+        run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from journey_outbox order by aggregate_id,aggregate_version" | node scripts/validate-journey-events.mjs
+      - name: Validate committed aftercare event envelopes
+        run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from journey_care_outbox order by aggregate_id,aggregate_version" | node scripts/validate-journey-care-events.mjs
+      - name: Validate local simulation event envelopes
+        run: docker compose exec -T postgres psql -U travbook -d travbook -At -c "select envelope::text from demo_event order by operation_id,version" | node scripts/validate-simulation-events.mjs
+      - run: node scripts/verify-compose-recovery.mjs
+      - run: docker compose stop
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compose-browser-evidence
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7

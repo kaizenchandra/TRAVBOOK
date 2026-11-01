@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:travbook:events:aftercare:v1",
+  "title": "MOCK cancellation events (outbox; publication pending)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "aggregateId",
+    "aggregateVersion",
+    "occurredAt",
+    "correlationId",
+    "causationId",
+    "producer",
+    "mode",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "enum": [
+        "CancellationQuoteCreated",
+        "CancellationStateRecorded"
+      ]
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "producer": {
+      "const": "booking"
+    },
+    "mode": {
+      "const": "MOCK"
+    },
+    "payload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bookingId",
+            "refundAmount",
+            "currency"
+          ],
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "refundAmount": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]{2}$"
+            },
+            "currency": {
+              "const": "INR"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bookingId",
+            "cancellationStatus",
+            "refundStatus",
+            "failureCode"
+          ],
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "cancellationStatus": {
+              "enum": [
+                "PENDING",
+                "CANCELLED",
+                "REJECTED",
+                "REVIEW"
+              ]
+            },
+            "refundStatus": {
+              "enum": [
+                "NOT_REQUESTED",
+                "PENDING",
+                "SUCCEEDED",
+                "NOT_DUE",
+                "REVIEW"
+              ]
+            },
+            "failureCode": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

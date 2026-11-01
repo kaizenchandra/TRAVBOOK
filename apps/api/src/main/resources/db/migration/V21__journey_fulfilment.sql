@@ -1,0 +1,23 @@
+CREATE TABLE journey_quote(id UUID PRIMARY KEY, customer_id UUID NOT NULL REFERENCES customer_account(id), expires_at TIMESTAMPTZ NOT NULL, payload JSONB NOT NULL, UNIQUE(id,customer_id), CHECK((payload->>'id')::uuid=id AND (payload->>'owner')::uuid=customer_id AND payload->>'mode'='MOCK'));
+CREATE TABLE journey_acceptance(quote_id UUID PRIMARY KEY REFERENCES journey_quote(id), accepted_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE journey_booking(id UUID PRIMARY KEY, quote_id UUID NOT NULL UNIQUE, customer_id UUID NOT NULL REFERENCES customer_account(id),version BIGINT NOT NULL CHECK(version>0),created_at TIMESTAMPTZ NOT NULL,status TEXT NOT NULL,payload JSONB NOT NULL,FOREIGN KEY(quote_id,customer_id) REFERENCES journey_quote(id,customer_id), CHECK((payload->>'id')::uuid=id AND (payload->>'version')::bigint=version AND payload->>'status'=status AND (payload->'quote'->>'id')::uuid=quote_id AND (payload->'quote'->>'owner')::uuid=customer_id AND payload->>'mode'='MOCK'));
+CREATE INDEX journey_booking_owner ON journey_booking(customer_id,created_at DESC,id DESC);
+CREATE TABLE journey_work(booking_id UUID PRIMARY KEY REFERENCES journey_booking(id),state TEXT NOT NULL CHECK(state IN('READY','RUNNING','DONE','REVIEW')), attempts INT NOT NULL DEFAULT 0 CHECK(attempts>=0),next_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),lease_token UUID,lease_until TIMESTAMPTZ);
+CREATE INDEX journey_work_due ON journey_work(next_at) WHERE state IN('READY','RUNNING');
+CREATE TABLE journey_command(customer_id UUID NOT NULL REFERENCES customer_account(id),operation TEXT NOT NULL,command_key VARCHAR(100) NOT NULL,fingerprint TEXT NOT NULL,resource_id UUID NOT NULL,PRIMARY KEY(customer_id,operation,command_key));
+CREATE TABLE journey_cancellation_quote(id UUID PRIMARY KEY,booking_id UUID NOT NULL REFERENCES journey_booking(id),customer_id UUID NOT NULL REFERENCES customer_account(id),payload JSONB NOT NULL);
+CREATE TABLE journey_document(id UUID PRIMARY KEY,booking_id UUID NOT NULL UNIQUE REFERENCES journey_booking(id),payload JSONB NOT NULL);
+CREATE TABLE journey_outbox(id UUID PRIMARY KEY,aggregate_id UUID NOT NULL,aggregate_version BIGINT NOT NULL,event_type TEXT NOT NULL,envelope JSONB NOT NULL,UNIQUE(aggregate_id,aggregate_version),CHECK((envelope->>'eventId')::uuid=id AND (envelope->>'aggregateId')::uuid=aggregate_id AND envelope->>'mode'='MOCK' AND envelope->>'producer'='journeys'));
+-- Separate simulated provider authority; intentionally no FK into platform booking tables.
+CREATE TABLE journey_supplier_receipt(operation_id UUID PRIMARY KEY,booking_id UUID NOT NULL,step TEXT NOT NULL,payload JSONB NOT NULL,UNIQUE(booking_id,step));
+CREATE TABLE journey_supplier_reservation(booking_id UUID PRIMARY KEY,kind TEXT NOT NULL CHECK(kind IN('BUS','CAB','HOLIDAY')),resource TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('HELD','CONFIRMED','RELEASED','REJECTED','CANCELLED')),expires_at TIMESTAMPTZ NOT NULL,payload JSONB NOT NULL);
+CREATE TABLE journey_supplier_seat(resource TEXT NOT NULL,seat TEXT NOT NULL,booking_id UUID NOT NULL REFERENCES journey_supplier_reservation(booking_id),expires_at TIMESTAMPTZ NOT NULL,confirmed BOOLEAN NOT NULL DEFAULT false,PRIMARY KEY(resource,seat));
+CREATE INDEX journey_supplier_seat_booking ON journey_supplier_seat(booking_id);
+CREATE TABLE journey_supplier_component(booking_id UUID NOT NULL REFERENCES journey_supplier_reservation(booking_id),component_id TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('CONFIRMED','CANCELLED')),amount NUMERIC(14,2) NOT NULL CHECK(amount>=0),currency CHAR(3) NOT NULL CHECK(currency='INR'),PRIMARY KEY(booking_id,component_id));
+CREATE TRIGGER immutable_journey_quote BEFORE UPDATE OR DELETE ON journey_quote FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_acceptance BEFORE UPDATE OR DELETE ON journey_acceptance FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_command BEFORE UPDATE OR DELETE ON journey_command FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_cancellation BEFORE UPDATE OR DELETE ON journey_cancellation_quote FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_document BEFORE UPDATE OR DELETE ON journey_document FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_outbox BEFORE UPDATE OR DELETE ON journey_outbox FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_journey_supplier_receipt BEFORE UPDATE OR DELETE ON journey_supplier_receipt FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();

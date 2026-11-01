@@ -1,0 +1,5 @@
+-- Legacy proof records describe observed outcomes, not fabricated prior workflow steps.
+CREATE TABLE stay_legacy_proof(action_id UUID PRIMARY KEY REFERENCES stay_recovery_action(id),booking_id UUID NOT NULL REFERENCES stay_booking(id),prior_version BIGINT NOT NULL CHECK(prior_version>0),proof JSONB NOT NULL,CHECK((proof->>'bookingId')::uuid=booking_id AND proof->>'mode'='MOCK' AND proof->>'outcome' IN('FULFILLED','CANCELLED')));
+CREATE TRIGGER immutable_stay_legacy_proof BEFORE UPDATE OR DELETE ON stay_legacy_proof FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TABLE rail_ticket_legacy_proof(action_id UUID PRIMARY KEY REFERENCES rail_ticket_recovery_action(id),booking_id UUID NOT NULL REFERENCES rail_ticket_booking(id),prior_version BIGINT NOT NULL CHECK(prior_version>0),proof JSONB NOT NULL,CHECK((proof->>'bookingId')::uuid=booking_id AND proof->>'mode'='MOCK' AND proof->>'outcome' IN('FULFILLED','CANCELLED')));
+CREATE TRIGGER immutable_rail_ticket_legacy_proof BEFORE UPDATE OR DELETE ON rail_ticket_legacy_proof FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();

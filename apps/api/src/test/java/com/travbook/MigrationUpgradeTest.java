@@ -1,0 +1,104 @@
+package com.travbook;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.testcontainers.junit.jupiter.*;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import java.util.UUID;
+import static org.assertj.core.api.Assertions.assertThat;
+@Testcontainers
+class MigrationUpgradeTest {
+    @Container static PostgreSQLContainer postgres=new PostgreSQLContainer("postgres:17.6-alpine");
+    @Test void existingV1SearchDataSurvivesPricingMigrations() {
+        var source=new DriverManagerDataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword());
+        Flyway.configure().dataSource(source).target("1").load().migrate();
+        var jdbc=JdbcClient.create(source);var id=UUID.randomUUID();
+        jdbc.sql("insert into search_snapshot(id,mode,created_at,expires_at,payload) values(:id,'MOCK',now(),now()+interval '15 minutes','{\"migrationSentinel\":true}')").param("id",id).update();
+        assertThat(Flyway.configure().dataSource(source).target("2").load().migrate().migrationsExecuted).isEqualTo(1);
+        var eventId=UUID.randomUUID();
+        jdbc.sql("insert into pricing_outbox(id,aggregate_id,event_type,mode,envelope) values(:id,:aggregate,'QuotationCreated','MOCK','{\"schemaVersion\":1}')")
+            .param("id",eventId).param("aggregate",id).update();
+        assertThat(Flyway.configure().dataSource(source).target("3").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select envelope->>'mode' from pricing_outbox where id=:id").param("id",eventId).query(String.class).single()).isEqualTo("MOCK");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->jdbc.sql("update pricing_outbox set envelope='{}' where id=:id").param("id",eventId).update())
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(jdbc.sql("update pricing_outbox set published_at=now() where id=:id").param("id",eventId).update()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from search_snapshot where id=:id and payload->>'migrationSentinel'='true'").param("id",id).query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from catalog_location").query(Integer.class).single()).isEqualTo(8);
+        assertThat(jdbc.sql("select count(*) from customer_account").query(Integer.class).single()).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("4").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from booking_intent").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from search_snapshot where id=:id").param("id",id).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("5").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select column_default from information_schema.columns where table_name='booking_workflow' and column_name='definition_version'").query(String.class).single()).isEqualTo("1");
+        var bookingId=UUID.randomUUID();var pendingEvent=UUID.randomUUID();
+        jdbc.sql("insert into booking_intent(id,quote_id,customer_id,fingerprint,mode,input_snapshot,created_at,updated_at,version,status) values(:id,:quote,:owner,:hash,'MOCK','{}',now(),now(),1,'CREATED')")
+            .param("id",bookingId).param("quote",UUID.randomUUID()).param("owner",UUID.randomUUID()).param("hash","a".repeat(64)).update();
+        jdbc.sql("insert into booking_outbox(id,aggregate_id,aggregate_version,event_type,mode,envelope) values(:id,:aggregate,1,'BookingCreated','MOCK','{\"migrationSentinel\":true}')")
+            .param("id",pendingEvent).param("aggregate",bookingId).update();
+        assertThat(Flyway.configure().dataSource(source).target("6").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select status from booking_event_delivery where event_id=:id").param("id",pendingEvent).query(String.class).single()).isEqualTo("READY");
+        assertThat(jdbc.sql("select envelope->>'migrationSentinel' from booking_outbox where id=:id").param("id",pendingEvent).query(String.class).single()).isEqualTo("true");
+        assertThat(Flyway.configure().dataSource(source).target("7").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from booking_checkout").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_event_delivery where event_id=:id").param("id",pendingEvent).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("8").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from trip_document").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("9").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from payment_refund").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("10").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from hotel_search").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("11").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from rail_station").query(Integer.class).single()).isEqualTo(6);
+        assertThat(jdbc.sql("select count(*) from rail_search").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("12").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from stay_booking").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from hotel_room_allocation").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("13").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from stay_booking").query(Integer.class).single()).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("14").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from rail_ticket_booking").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from rail_provider_operation").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from search_snapshot where id=:id").param("id",id).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("15").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from rail_ticket_review_checkpoint").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from stay_recovery_action").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("16").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from rail_provider_passenger").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("17").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from rail_ticket_legacy_proof").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("18").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from stay_quote_use").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("19").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from stay_change_quote").query(Integer.class).single()).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("20").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("21").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("22").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("23").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("24").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("25").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("26").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("27").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("28").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("29").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from coupon_redemption").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from customer_organizer").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from fp_reservation").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from demo_operation").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from customer_profile").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from holiday_enquiry").query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from booking_intent where id=:id").param("id",bookingId).query(Integer.class).single()).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isZero();
+    }
+}

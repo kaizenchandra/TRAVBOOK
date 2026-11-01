@@ -1,0 +1,11 @@
+-- No historical REVIEW state is inferred. Only new atomic checkpoints permit recovery.
+CREATE TABLE stay_review_checkpoint(booking_id UUID NOT NULL REFERENCES stay_booking(id),review_version BIGINT NOT NULL CHECK(review_version>1),payload JSONB NOT NULL,PRIMARY KEY(booking_id,review_version),CHECK((payload->>'id')::uuid=booking_id AND (payload->>'version')::bigint+1=review_version));
+CREATE TABLE stay_recovery_action(id UUID PRIMARY KEY,booking_id UUID NOT NULL REFERENCES stay_booking(id),actor VARCHAR(64) NOT NULL,command_key VARCHAR(100) NOT NULL,fingerprint VARCHAR(200) NOT NULL,created_at TIMESTAMPTZ NOT NULL,payload JSONB NOT NULL,UNIQUE(actor,command_key),CHECK((payload->>'id')::uuid=id AND (payload->>'bookingId')::uuid=booking_id AND payload->>'actor'=actor));
+CREATE INDEX stay_review_queue ON stay_booking(updated_at,id) WHERE status='REVIEW';
+CREATE TRIGGER immutable_stay_checkpoint BEFORE UPDATE OR DELETE ON stay_review_checkpoint FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_stay_recovery_action BEFORE UPDATE OR DELETE ON stay_recovery_action FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TABLE rail_ticket_review_checkpoint(booking_id UUID NOT NULL REFERENCES rail_ticket_booking(id),review_version BIGINT NOT NULL CHECK(review_version>1),payload JSONB NOT NULL,PRIMARY KEY(booking_id,review_version),CHECK((payload->>'id')::uuid=booking_id AND (payload->>'version')::bigint+1=review_version));
+CREATE TABLE rail_ticket_recovery_action(id UUID PRIMARY KEY,booking_id UUID NOT NULL REFERENCES rail_ticket_booking(id),actor VARCHAR(64) NOT NULL,command_key VARCHAR(100) NOT NULL,fingerprint VARCHAR(200) NOT NULL,created_at TIMESTAMPTZ NOT NULL,payload JSONB NOT NULL,UNIQUE(actor,command_key),CHECK((payload->>'id')::uuid=id AND (payload->>'bookingId')::uuid=booking_id AND payload->>'actor'=actor));
+CREATE INDEX rail_ticket_review_queue ON rail_ticket_booking(updated_at,id) WHERE status='REVIEW';
+CREATE TRIGGER immutable_rail_ticket_checkpoint BEFORE UPDATE OR DELETE ON rail_ticket_review_checkpoint FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+CREATE TRIGGER immutable_rail_ticket_recovery_action BEFORE UPDATE OR DELETE ON rail_ticket_recovery_action FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();

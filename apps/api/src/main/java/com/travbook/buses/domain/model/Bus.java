@@ -1,0 +1,30 @@
+package com.travbook.buses.domain.model;
+import com.travbook.shared.domain.*;
+import java.time.*;
+import java.math.BigDecimal;
+import java.util.*;
+import static com.travbook.shared.domain.DomainFailure.Code.*;
+public final class Bus {
+ private Bus(){}
+ public enum City{DELHI,JAIPUR,AGRA,MUMBAI,PUNE,BENGALURU,MYSURU,GOA}
+ public enum Type{SEATER,SLEEPER} public enum Deck{LOWER,UPPER} public enum SeatStatus{AVAILABLE,OCCUPIED,RESTRICTED}
+ public enum TypeFilter{ALL,SEATER,SLEEPER} public enum AcFilter{ALL,AC,NON_AC} public enum Period{ALL,MORNING,EVENING,NIGHT} public enum Sort{PRICE,DEPARTURE,DURATION,RATING}
+ public record Criteria(City origin,City destination,LocalDate date,List<Integer> passengerAges){public Criteria{passengerAges=List.copyOf(passengerAges);if(origin==null||destination==null||origin==destination||date==null||passengerAges.isEmpty()||passengerAges.size()>6||passengerAges.stream().anyMatch(a->a<5||a>120))throw new DomainFailure(VALIDATION_FAILED,"Choose different cities and one to six seated passengers aged 5–120.");}public void valid(Clock clock){var today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));if(date.isBefore(today)||date.isAfter(today.plusDays(90)))throw new DomainFailure(VALIDATION_FAILED,"Bus travel date must be within the next 90 days.");}}
+ public record Seat(String id,Deck deck,int row,int column,Type type,SeatStatus status,int minimumAge,TravelMoney fare){}
+ public record Stop(String id,String name,Instant time){}
+ public record Trip(UUID id,String supplier,String operator,City origin,City destination,Instant departureAt,Instant arrivalAt,String timezone,int durationMinutes,Type type,boolean ac,String rating,List<String> amenities,String cancellationPolicy,String instructions,List<Stop> boarding,List<Stop> dropping,List<Seat> seats,TravelMoney minimumFare){public Trip{amenities=List.copyOf(amenities);boarding=List.copyOf(boarding);dropping=List.copyOf(dropping);seats=List.copyOf(seats);}}
+ public record Inventory(List<Trip> trips,List<SupplierCoverage> coverage){}
+ public record Snapshot(UUID id,Criteria criteria,List<Trip> trips,List<SupplierCoverage> coverage,Instant createdAt,Instant expiresAt,String mode) implements ObservedSnapshot{public Snapshot{trips=List.copyOf(trips);coverage=List.copyOf(coverage);if(!"MOCK".equals(mode)||!expiresAt.isAfter(createdAt))throw new IllegalArgumentException("Invalid bus observation");}public void fresh(Instant now){if(!expiresAt.isAfter(now))throw new DomainFailure(SEARCH_EXPIRED,"This bus search expired. Search again.");}public Trip trip(UUID id){return trips.stream().filter(t->t.id().equals(id)).findFirst().orElseThrow(()->new DomainFailure(NOT_FOUND,"Bus trip was not returned by this search."));}}
+ public record Filter(String operator,TypeFilter type,AcFilter ac,String boarding,Period period,Sort sort,BigDecimal maxFare,int page,int size){public Filter{if(operator==null||operator.length()>80||boarding==null||boarding.length()>80||type==null||ac==null||period==null||sort==null||maxFare==null||maxFare.signum()<0||maxFare.scale()>2||maxFare.compareTo(new BigDecimal("99999999"))>0||page<0||page>100||size<1||size>20)throw new DomainFailure(VALIDATION_FAILED,"Invalid bus filters.");}public static Filter defaults(){return new Filter("",TypeFilter.ALL,AcFilter.ALL,"",Period.ALL,Sort.PRICE,new BigDecimal("99999999"),0,5);}}
+ public record Page(UUID id,Criteria criteria,List<Trip> items,List<SupplierCoverage> coverage,Instant createdAt,Instant expiresAt,String mode,int total,int page,int size){}
+ public record Detail(UUID searchId,Criteria criteria,Trip trip,Instant observedAt,Instant expiresAt,String mode){}
+ public record FareCheck(UUID searchId,UUID tripId,List<Seat> seats,String boardingId,String droppingId,TravelMoney previousTotal,TravelMoney total,boolean changed,boolean complete,Instant checkedAt,Instant validUntil,String mode){}
+ public static FareCheck fare(Snapshot snapshot,Trip original,Trip fresh,List<String> ids,String boarding,String dropping,Instant now){
+  if(ids==null||ids.isEmpty()||ids.size()>snapshot.criteria().passengerAges().size()||new HashSet<>(ids).size()!=ids.size())throw new DomainFailure(VALIDATION_FAILED,"Select distinct seats in passenger order, up to your party size.");
+  if(!fresh.id().equals(original.id())||!fresh.supplier().equals(original.supplier())||!fresh.departureAt().equals(original.departureAt()))throw new DomainFailure(SUPPLIERS_UNAVAILABLE,"Provider returned mismatched bus details.");
+  if(fresh.boarding().stream().noneMatch(p->p.id().equals(boarding))||fresh.dropping().stream().noneMatch(p->p.id().equals(dropping)))throw new DomainFailure(VALIDATION_FAILED,"Select boarding and dropping points returned for this trip.");
+  if(!fresh.departureAt().isAfter(now))throw new DomainFailure(OFFER_EXPIRED,"This bus has departed.");var chosen=new ArrayList<Seat>();BigDecimal before=BigDecimal.ZERO,total=BigDecimal.ZERO;
+  for(int i=0;i<ids.size();i++){String id=ids.get(i);var seat=fresh.seats().stream().filter(v->v.id().equals(id)).findFirst().orElseThrow(()->new DomainFailure(VALIDATION_FAILED,"Unknown bus seat."));if(seat.status()!=SeatStatus.AVAILABLE)throw new DomainFailure(OFFER_UNAVAILABLE,"A selected seat is occupied or restricted. Refresh the seat map and choose another seat.");if(snapshot.criteria().passengerAges().get(i)<seat.minimumAge())throw new DomainFailure(VALIDATION_FAILED,"Passenger "+(i+1)+" is below the selected berth's minimum age of "+seat.minimumAge()+".");chosen.add(seat);total=total.add(seat.fare().decimal());before=before.add(original.seats().stream().filter(v->v.id().equals(id)).findFirst().orElseThrow(()->new DomainFailure(OFFER_UNAVAILABLE,"Seat layout changed; reload details.")).fare().decimal());}
+  Instant until=now.plusSeconds(60);if(snapshot.expiresAt().isBefore(until))until=snapshot.expiresAt();if(fresh.departureAt().isBefore(until))until=fresh.departureAt();return new FareCheck(snapshot.id(),fresh.id(),List.copyOf(chosen),boarding,dropping,TravelMoney.inr(before),TravelMoney.inr(total),before.compareTo(total)!=0,ids.size()==snapshot.criteria().passengerAges().size(),now,until,"MOCK");
+ }
+}

@@ -1,0 +1,16 @@
+# ADR 0023 — Authenticated local API sandbox
+
+The user explicitly requests dummy APIs for unavailable integrations and unfinished supporting services. Add a bounded `simulation` context to the modular application, not another deployable microservice or a pretend live supplier. Its domain owns only simulator operations and previews. Production notification, coupon-redemption, privacy/compliance and settlement capabilities remain separate requirements.
+
+Reuse existing travel search/quote/booking/payment/refund APIs and durable providers. Publish an authenticated capability catalog linking to their actual routes. New `/api/v1/demo` operations are enabled only by `DEMO_APIS_ENABLED=true` with integration mode MOCK. They fail closed otherwise. The local Compose deployment enables them; no credentials or cloud account are required.
+
+- Messaging: owned durable email/SMS test jobs, local inbox receipts, bounded retries, leases/fencing and provider-receipt deduplication. No recipient address, message free text or external delivery is accepted. Success explicitly says SIMULATED_DELIVERED.
+- GPS: owned confirmed cab dispatch supplies synthetic coordinates tied to its persisted stage/version/time through the core-owned DemoPositions port and FixedDemoPositions adapter. Existing dispatch-demo advances the stage. No real position/driver/contact or background location permission is involved; stale data and terminal states remain explicit.
+- Coupons: validate a sample code against an owned unexpired flight quotation and calculate a server-side preview. It never mutates an accepted quote, reserves redemption, lowers a payment or claims an applied discount.
+- Privacy: profile-only export preview, plus durable simulated export/erasure requests ending in SIMULATED_REVIEW_REQUIRED. No actual deletion, full account export, consent withdrawal or legal fulfilment is claimed.
+- Finance: add a published payments read port for owner-scoped summaries of existing MOCK account/journal/refund records. A consistent database snapshot exposes unbalanced-posting counts; it is not external settlement reconciliation or global operator reporting.
+- AWS: explicitly report NOT_DEPLOYED / LOCAL_COMPOSE. Existing mocked Terraform tests are the dummy infrastructure target; no fake cloud success or apply action.
+
+Inbound adapters invoke core-owned ports. The simulator uses only public customer, pricing, journey and payment contracts. Its persistence adapter owns only simulation tables. The financial adapter reads only payment-context tables. Customer identities come from verified OIDC; keys and queries are owner scoped, cookie writes require CSRF, and API/UI responses retain MOCK labels.
+
+AC-085: capability catalog and actual travel/payment API discovery; owned queued dummy messages with safe retries and replay. AC-086: eligible/rejected/expired/foreign coupon previews, original quote unchanged. AC-087: owned synthetic GPS stage/staleness/cancellation behavior. AC-088: private profile preview and simulated requests with no deletion. AC-089: owner-scoped exact ledger reports/payment status, clear no-settlement/no-cloud claims. Verify domain, persistence, concurrency/crash, contract and desktop/mobile UI paths. Keep original P0/P1/P2 source priorities and incomplete production capabilities in the RTM.

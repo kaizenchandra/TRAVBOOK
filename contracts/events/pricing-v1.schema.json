@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:travbook:events:pricing:v1",
+  "title": "Pricing event envelope (durable outbox, publication pending)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId","eventType","schemaVersion","aggregateId","aggregateVersion","occurredAt","correlationId","causationId","producer","mode","payload"],
+  "properties": {
+    "eventId": {"type":"string","format":"uuid"},
+    "eventType": {"enum":["QuotationCreated","QuotationAccepted"]},
+    "schemaVersion": {"const":1},
+    "aggregateId": {"type":"string","format":"uuid","description":"Quote ID for creation; separate acceptance receipt ID for acceptance."},
+    "aggregateVersion": {"const":1},
+    "occurredAt": {"type":"string","format":"date-time"},
+    "correlationId": {"type":"string","format":"uuid"},
+    "causationId": {"type":"string","format":"uuid"},
+    "producer": {"const":"pricing"},
+    "mode": {"const":"MOCK"},
+    "payload": {
+      "type":"object", "additionalProperties":false,
+      "required":["quoteId","quoteVersion"],
+      "properties":{"quoteId":{"type":"string","format":"uuid"},"quoteVersion":{"const":1}}
+    }
+  }
+}

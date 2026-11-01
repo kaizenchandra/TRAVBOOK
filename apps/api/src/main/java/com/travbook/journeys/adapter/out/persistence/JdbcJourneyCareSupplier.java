@@ -1,0 +1,15 @@
+package com.travbook.journeys.adapter.out.persistence;
+import com.travbook.journeys.application.port.out.JourneyCareSupplier;
+import com.travbook.journeys.domain.model.Care.Action;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.ObjectMapper;
+import java.util.*;
+public final class JdbcJourneyCareSupplier implements JourneyCareSupplier {
+ private final JdbcClient jdbc;private final TransactionTemplate tx;private final ObjectMapper json;
+ public JdbcJourneyCareSupplier(JdbcClient j,TransactionTemplate t,ObjectMapper m){jdbc=j;tx=t;json=m;}
+ private void outside(){if(TransactionSynchronizationManager.isActualTransactionActive())throw new IllegalStateException("Provider effect inside local transaction");}
+ public Optional<Receipt> lookup(UUID op){outside();return jdbc.sql("select payload::text from journey_supplier_care_receipt where operation_id=:id").param("id",op).query(String.class).optional().map(p->json.readValue(p,Receipt.class));}
+ public Receipt cancel(Action a){outside();return tx.execute(t->{var b=a.booking();jdbc.sql("select pg_advisory_xact_lock(hashtextextended(:key,0))").param("key","journey-supplier:"+b.id()).query((r,n)->true).single();var prior=jdbc.sql("select payload::text from journey_supplier_care_receipt where operation_id=:id").param("id",a.operation("cancel")).query(String.class).optional();if(prior.isPresent()){var r=json.readValue(prior.get(),Receipt.class);if(!r.fingerprint().equals(b.supplierFingerprint())||!r.components().equals(a.componentIds()))throw new IllegalStateException("Cancellation key binding mismatch");return r;}String state=jdbc.sql("select status from journey_supplier_reservation where booking_id=:id for update").param("id",b.id()).query(String.class).optional().orElseThrow();if(!state.equals("CONFIRMED"))throw new IllegalStateException("Supplier state needs reconciliation");for(String component:a.componentIds()){int changed=jdbc.sql("update journey_supplier_component set status='CANCELLED' where booking_id=:id and component_id=:c and status='CONFIRMED'").param("id",b.id()).param("c",component).update();if(changed!=1)throw new IllegalStateException("Unknown component cancellation outcome");jdbc.sql("delete from journey_supplier_seat where booking_id=:id and seat=:c").param("id",b.id()).param("c",component).update();}int remaining=jdbc.sql("select count(*) from journey_supplier_component where booking_id=:id and status='CONFIRMED'").param("id",b.id()).query(Integer.class).single();if(remaining==0)jdbc.sql("update journey_supplier_reservation set status='CANCELLED' where booking_id=:id").param("id",b.id()).update();var receipt=new Receipt(a.operation("cancel"),b.id(),a.componentIds(),b.supplierFingerprint(),true,"MOCK-JOURNEY-"+b.id(),"MOCK");jdbc.sql("insert into journey_supplier_care_receipt(operation_id,booking_id,payload) values(:op,:id,cast(:p as jsonb))").param("op",receipt.operationId()).param("id",b.id()).param("p",json.writeValueAsString(receipt)).update();return receipt;});}
+}

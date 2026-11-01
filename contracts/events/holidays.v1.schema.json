@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local holiday observation/enquiry event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "aggregateId",
+    "aggregateVersion",
+    "schemaVersion",
+    "eventType",
+    "occurredAt",
+    "correlationId",
+    "causationId",
+    "producer",
+    "mode"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "const": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "eventType": {
+      "enum": [
+        "HolidayQuoteCreated",
+        "HolidayEnquiryRecorded"
+      ]
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "producer": {
+      "const": "holidays"
+    },
+    "mode": {
+      "const": "MOCK"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+travbook:
+  login-enabled: true
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          travbook:
+            provider: travbook
+            client-id: ${OIDC_CLIENT_ID}
+            client-secret: ${OIDC_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: ${travbook.web-origin}/login/oauth2/code/travbook
+            scope: openid,quotes:read,quotes:write,bookings:read,bookings:write
+        provider:
+          travbook:
+            issuer-uri: ${travbook.oidc-issuer}

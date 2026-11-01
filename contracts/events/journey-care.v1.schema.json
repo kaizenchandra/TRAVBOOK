@@ -1,0 +1,14 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "title":"MOCK journey aftercare/funding workflow event",
+ "type":"object","additionalProperties":false,
+ "required":["eventId","aggregateId","aggregateVersion","schemaVersion","eventType","timestamp","correlationId","causationId","producer","mode","payload"],
+ "properties":{
+  "eventId":{"type":"string","format":"uuid"},"aggregateId":{"type":"string","format":"uuid"},"aggregateVersion":{"type":"integer","minimum":1},"schemaVersion":{"const":1},
+  "eventType":{"type":"string","pattern":"^JourneyCare(CANCEL|BALANCE|RESCHEDULE)(PENDING|WAITING|SUCCEEDED|FAILED|REVIEW)$"},
+  "timestamp":{"type":"string","format":"date-time"},"correlationId":{"type":"string","format":"uuid"},"causationId":{"type":"string","format":"uuid"},"producer":{"const":"journey-care"},"mode":{"const":"MOCK"},
+  "payload":{"type":"object","additionalProperties":false,"required":["bookingId","type","status","step"],"properties":{
+   "bookingId":{"type":"string","format":"uuid"},"type":{"enum":["CANCEL","BALANCE","RESCHEDULE"]},"status":{"enum":["PENDING","WAITING","SUCCEEDED","FAILED","REVIEW"]},"step":{"enum":["VALIDATE","WAIT_REPLACEMENT","AUTHORIZE","CAPTURE","VOID","CANCEL","REFUND","REFUND_STATUS","DONE"]}
+  }}
+ }
+}

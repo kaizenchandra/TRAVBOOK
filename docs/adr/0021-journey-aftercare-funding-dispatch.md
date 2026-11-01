@@ -1,0 +1,13 @@
+# ADR 0021 — Versioned journey aftercare, funding and cab dispatch
+
+Status: accepted; scoped cross-layer MOCK behavior verified.
+
+AC-078: v2 terms and owned partial cancellation of bus seats / optional holiday activities, remaining-party eligibility, exact per-component paid entitlements, duplicate-safe provider release/refunds and revised protected documents. Legacy v1 terms remain unchanged; cabs cancel as one vehicle service.
+AC-079: bus rescheduling uses an owned accepted replacement quote and linked booking, full replacement payment and original refund. Original inventory is cancelled only after the replacement is supplier-confirmed. Failed replacement keeps the original. Conditional cancellation entitlement is frozen at the accepted reschedule request; all mutations serialize with other aftercare. Same route/provider/party/INR only; no silent fare acceptance.
+AC-080: optional holiday 30% deposit / 70% balance, exact decimal allocations and explicit due date 48h before departure; eligibility requires sufficient lead time. Reservation status and funding status are separate. Final voucher requires full payment. Full cancellation returns only collected funds; partial optional-activity cancellation requires fully paid funding. Missed balance deadline triggers durable cancellation/refund, never an invented successful payment.
+AC-081: owned confirmed cab assignment and persisted, forward-only MOCK dispatch progression, freshness/terminal states and cancellation invalidation. Synthetic driver/vehicle labels are not real identities; no contact numbers, live GPS or routing claims. Explicit demo advancement is MOCK-only, authenticated, CSRF/idempotency protected.
+AC-082: API compatibility, ownership, financial conservation, contention, lost acknowledgements/restart, outbox, migration preservation and desktop/mobile/keyboard browser checks.
+
+Plan: v2 contracts and immutable terms → domain/state/adapters and additive V23 → typed checkout/aftercare/dispatch UI → meaningful integration/failure tests and browser gates → evidence/RTM/runbooks. Existing flight/hotel/rail work is preserved. Authorized providers, valid travel documents and AWS deployment remain blocked on external access/target metadata; no live calls or cloud apply are authorized by simulation controls.
+
+[Architecture and sequences](../journey-aftercare-architecture.md), [operating limits](../runbooks/journey-aftercare-funding-dispatch.md), [execution evidence](../verification-journey-aftercare.md). V2 traffic must only reach compatible application instances; after v2 quotes exist, use a forward-compatible rollback/forward fix rather than deploying a pre-V23 binary or restoring away financial history. A rolling AWS rollout has not been tested.

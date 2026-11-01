@@ -1,0 +1,13 @@
+CREATE TABLE stay_change_quote(quote_id UUID PRIMARY KEY REFERENCES stay_quote(id),booking_id UUID NOT NULL REFERENCES stay_booking(id),booking_version BIGINT NOT NULL CHECK(booking_version>0));
+CREATE TRIGGER immutable_stay_change_quote BEFORE UPDATE OR DELETE ON stay_change_quote FOR EACH ROW EXECUTE FUNCTION reject_booking_command_change();
+ALTER TABLE hotel_provider_reservation ADD COLUMN guest_operation_id UUID REFERENCES hotel_provider_operation(operation_id);
+CREATE OR REPLACE FUNCTION guard_stay_booking() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Hotel booking history is immutable'; END IF;
+ IF NEW.id<>OLD.id OR NEW.customer_id<>OLD.customer_id OR NEW.quote_id<>OLD.quote_id OR NEW.created_at<>OLD.created_at OR NEW.version<>OLD.version+1
+ OR (NEW.payload-'changes'-'amendments'-'version'-'updatedAt'-'status'-'payment'-'reservation'-'refund'-'step'-'supplierReference'-'paymentReference'-'refundReference'-'failureCode'-'cancellation') IS DISTINCT FROM (OLD.payload-'changes'-'amendments'-'version'-'updatedAt'-'status'-'payment'-'reservation'-'refund'-'step'-'supplierReference'-'paymentReference'-'refundReference'-'failureCode'-'cancellation')
+ OR (OLD.payload->'cancellation'<>'null'::jsonb AND NEW.payload->'cancellation' IS DISTINCT FROM OLD.payload->'cancellation') THEN RAISE EXCEPTION 'Hotel booking input/version guard'; END IF;
+ -- Closed amendment history cannot be rewritten; only append a pending request or close the last pending entry.
+ IF jsonb_array_length(COALESCE(NEW.payload->'amendments','[]'))>10 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(OLD.payload->'amendments','[]')) WITH ORDINALITY AS a(value,n) WHERE (a.value->>'state'<>'PENDING' AND NEW.payload->'amendments'->(a.n::int-1) IS DISTINCT FROM a.value) OR (a.value->>'state'='PENDING' AND ((NEW.payload->'amendments'->(a.n::int-1))-'state') IS DISTINCT FROM (a.value-'state'))) THEN RAISE EXCEPTION 'Hotel amendment history guard' USING ERRCODE='23514'; END IF;
+ IF jsonb_array_length(COALESCE(NEW.payload->'changes','[]'))>10 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(OLD.payload->'changes','[]')) WITH ORDINALITY AS c(value,n) WHERE ((c.value->>'state' IN('COMPLETED','COMPENSATED') OR c.value->>'state'='REJECTED' AND OLD.payload->>'step'='DONE') AND NEW.payload->'changes'->(c.n::int-1) IS DISTINCT FROM c.value) OR ((NEW.payload->'changes'->(c.n::int-1))-'state'-'payment'-'refund'-'paymentReference'-'refundReference') IS DISTINCT FROM (c.value-'state'-'payment'-'refund'-'paymentReference'-'refundReference')) THEN RAISE EXCEPTION 'Hotel change history guard' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;

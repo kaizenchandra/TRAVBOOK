@@ -1,0 +1,11 @@
+package com.travbook.platform.security;
+final class StayReturnPath {
+ private static final String UUID="[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}";
+ private StayReturnPath(){}
+ private static boolean journey(String value){
+  if(value.equals("/journeys/trips")||value.matches("/journeys/(quotes|bookings)/"+UUID))return true;
+  if(!value.startsWith("/journeys/new?"))return false;
+  try{var values=new java.util.HashMap<String,String>();for(var part:value.substring(14).split("&")){var pair=part.split("=",2);if(pair.length!=2||values.put(pair[0],java.net.URLDecoder.decode(pair[1],java.nio.charset.StandardCharsets.UTF_8))!=null)return false;}if(!java.util.Set.of("kind","sourceId","offerId","seats","boardingId","droppingId","requestId","replaces").containsAll(values.keySet()))return false;if(!values.getOrDefault("sourceId","").matches(UUID)||!values.getOrDefault("requestId","").matches(UUID))return false;String kind=values.get("kind");if(values.containsKey("replaces")&&(!"BUS".equals(kind)||!values.get("replaces").matches(UUID)))return false;if("HOLIDAY".equals(kind))return values.size()==3;if(!values.getOrDefault("offerId","").matches(UUID))return false;if("CAB".equals(kind))return values.size()==4;return "BUS".equals(kind)&&values.size()==(values.containsKey("replaces")?8:7)&&values.getOrDefault("seats","").matches("[LU][1-8](,[LU][1-8]){0,5}")&&values.getOrDefault("boardingId","").matches("[A-Z]+-(CENTRE|TERMINAL)")&&values.getOrDefault("droppingId","").matches("[A-Z]+-(CENTRE|TERMINAL)");}catch(RuntimeException e){return false;}
+ }
+ static boolean valid(String value){return value!=null&&value.length()<=512&&(value.equals("/notifications")||value.equals("/account/travel")||value.equals("/flight-services")||value.matches("/flight-services\\?(booking|quote)="+UUID)||journey(value)||value.matches("/holidays/packages/[a-z0-9-]{1,80}")||value.matches("/holidays/(quotes|enquiries)/"+UUID)||value.equals("/stays/trips")||value.equals("/rail-tickets/trips")||value.matches("/rail-tickets/(quotes|bookings)/"+UUID)||value.matches("/rail-tickets/quotes/new\\?journey="+UUID+"&travelClass=(SL|THREE_AC|TWO_AC)&quota=(GENERAL|TATKAL)&requestId="+UUID)||value.matches("/stays/(quotes|bookings)/"+UUID)||value.matches("/stays/quotes/new\\?offers="+UUID+"(?:,"+UUID+"){0,3}&requestId="+UUID));}
+}

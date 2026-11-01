@@ -1,0 +1,15 @@
+package com.travbook.rail.adapter.out.supplier;
+import com.travbook.rail.application.port.out.*;
+import com.travbook.rail.domain.model.Rail.*;
+import com.travbook.shared.domain.DomainFailure;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import static com.travbook.shared.domain.DomainFailure.Code.*;
+public final class BoundedRailGateway implements RailGateway {
+    private final List<RailSupplier> providers;private final ExecutorService executor;private final long budget;private final MeterRegistry metrics;
+    public BoundedRailGateway(List<RailSupplier> providers,ExecutorService executor,long budget,MeterRegistry metrics){this.providers=List.copyOf(providers);this.executor=executor;this.budget=budget;this.metrics=metrics;}
+    public Result search(Criteria q,Station origin,Station destination,Instant now){long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(budget);var tasks=new LinkedHashMap<RailSupplier,Future<List<Journey>>>();for(var p:providers)try{tasks.put(p,executor.submit(()->p.search(q,origin,destination,now)));}catch(RejectedExecutionException e){tasks.put(p,null);}var journeys=new ArrayList<Journey>();var coverage=new ArrayList<Coverage>();for(var entry:tasks.entrySet()){boolean available=false;try{if(entry.getValue()!=null){journeys.addAll(entry.getValue().isDone()?entry.getValue().get():entry.getValue().get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS));available=true;}}catch(InterruptedException e){Thread.currentThread().interrupt();}catch(ExecutionException|TimeoutException e){/* Explicit unavailable coverage. */}finally{if(entry.getValue()!=null)entry.getValue().cancel(true);}coverage.add(new Coverage(entry.getKey().id(),available));metrics.counter("travbook.rail.search","supplier",entry.getKey().id(),"outcome",available?"available":"unavailable","mode","MOCK").increment();}return new Result(journeys,coverage);}
+    public Availability availability(Journey j,TravelClass c,Quota q,Instant now){var provider=providers.stream().filter(p->p.id().equals(j.supplier())).findFirst().orElseThrow(()->new DomainFailure(SUPPLIERS_UNAVAILABLE,"Railway provider is unavailable."));Future<Availability> task=null;String outcome="unavailable";try{task=executor.submit(()->provider.availability(j,c,q,now));var result=task.get(budget,TimeUnit.MILLISECONDS);outcome="available";return result;}catch(ExecutionException e){if(e.getCause() instanceof DomainFailure f)throw f;throw new DomainFailure(SUPPLIERS_UNAVAILABLE,"Could not retrieve current railway availability.");}catch(InterruptedException e){Thread.currentThread().interrupt();throw new DomainFailure(SUPPLIERS_UNAVAILABLE,"Railway availability check interrupted.");}catch(TimeoutException|RejectedExecutionException e){throw new DomainFailure(SUPPLIERS_UNAVAILABLE,"Railway provider exceeded the time budget. Please retry.");}finally{if(task!=null)task.cancel(true);metrics.counter("travbook.rail.availability","supplier",provider.id(),"outcome",outcome,"mode","MOCK").increment();}}
+}

@@ -1,0 +1,18 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "title":"Durable MOCK journey lifecycle event",
+ "type":"object","additionalProperties":false,
+ "required":["eventId","aggregateId","aggregateVersion","eventType","schemaVersion","timestamp","correlationId","causationId","producer","mode","payload"],
+ "properties":{
+  "eventId":{"type":"string","format":"uuid"},"aggregateId":{"type":"string","format":"uuid"},
+  "aggregateVersion":{"type":"integer","minimum":1},"schemaVersion":{"const":1},
+  "eventType":{"type":"string","pattern":"^Journey[A-Za-z_]+$"},"timestamp":{"type":"string","format":"date-time"},
+  "correlationId":{"type":"string","format":"uuid"},"causationId":{"type":"string","format":"uuid"},
+  "producer":{"const":"journeys"},"mode":{"const":"MOCK"},
+  "payload":{"type":"object","additionalProperties":false,"required":["status","payment","reservation","refund"],"properties":{
+   "status":{"enum":["CREATED","ACCEPTED","HOLD_PENDING","AWAITING_PAYMENT","PAYMENT_PENDING","RESERVATION_PENDING","CONFIRMED","CANCELLATION_PENDING","CANCELLED","FAILED","REVIEW"]},
+   "payment":{"enum":["NONE","AUTHORIZED","CAPTURED","DECLINED","VOIDED"]},
+   "reservation":{"enum":["NONE","HELD","CONFIRMED","REJECTED","RELEASED","CANCELLED"]},"refund":{"enum":["NONE","PENDING","SUCCEEDED"]}
+  }}
+ }
+}

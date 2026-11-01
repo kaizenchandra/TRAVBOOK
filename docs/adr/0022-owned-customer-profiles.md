@@ -1,0 +1,13 @@
+# ADR 0022 — Persistent self-service customer profiles
+
+Implement FE-ACC-05 and BE-AUTH-007 through the existing verified OIDC identity and PostgreSQL customer context. This is platform-owned data, independent of supplier MOCK/SANDBOX/LIVE modes. It requires no simulated profile provider. Authorized external travel/payment/notification/GPS adapters and production IdP/AWS configuration remain separate dependencies.
+
+Expose GET/PUT `/api/v1/me/profile`; retain the existing GET `/api/v1/me` response. The authenticated issuer/subject resolves the owner; the submitted expectedCustomerId is only an account-switch precondition and can never select a different owner. These self-service operations are available to authenticated customer identities with the existing verified API audience. Cookie mutations require CSRF. Contact changes never change the login identity, confer roles, update booking passenger snapshots or assert verified contact ownership.
+
+A full replacement includes expected customer ID and version, display name, optional email/phone and explicit storage consent. Empty strings clear fields. Version zero means no profile has been saved. Conventional email and international phone syntax are validated in the framework-free domain. Contact verification remains false until a separately authorized verification flow is implemented.
+
+Serialize writes on the owned customer row. Persist profile, request fingerprint/idempotency receipt and a metadata-only audit event in one local transaction with a three-second timeout. Changed payload reuse or stale versions conflict. Equivalent retries return the original applied version plus the current profile, rather than retaining historical PII copies. Audit entries retain changed field names, actor/customer ID, version, time and correlation; no contact/name values. No external call occurs in the transaction.
+
+Frontend query keys include the owner; errors and reauthentication hide private views. Form state remains only in memory; no profile values in URLs, analytics or browser storage. A lost response can be retried with the same in-memory command. Reloading reads authoritative current state. Explicit refresh resolves version conflicts without silently overwriting newer data.
+
+Acceptance AC-083: sign in → load → edit/consent → persist → refresh/re-login → same owned profile; other customer cannot see it. AC-084: invalid input/CSRF/anonymous/owner injection rejected; concurrent stale writes conflict; same-key retry creates one version/audit; audit failure rolls back; old contact values are not stored in command/audit history. Actual email/phone verification, notifications, account export/deletion and broader consent/retention controls remain incomplete requirements.

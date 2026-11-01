@@ -1,0 +1,11 @@
+# Only for compose.yaml: browser ports MUST be published on 127.0.0.1.
+# Explicit client endpoints are configured in LocalComposeIdentityConfiguration.
+travbook:
+  login-enabled: true
+  local-identity: true
+  oidc-issuer: http://127.0.0.1:8180/realms/travbook
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false

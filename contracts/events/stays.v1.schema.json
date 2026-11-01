@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hotel lifecycle event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "aggregateId",
+    "aggregateVersion",
+    "eventType",
+    "schemaVersion",
+    "producer",
+    "mode",
+    "occurredAt",
+    "correlationId",
+    "causationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eventType": {
+      "enum": [
+        "HotelQuoteCreated",
+        "HotelQuoteAccepted",
+        "HotelBookingCreated",
+        "HotelCancellationRequested",
+        "HotelBookingConfirmed",
+        "HotelRefundCompleted",
+        "HotelBookingCancelled",
+        "HotelBookingFailed",
+        "HotelReconciliationRequired",
+        "HotelWorkflowProgressed",
+        "HotelVoucherCreated",
+        "HotelReconciliationResumed",
+        "HotelLegacyOutcomeReconciled",
+        "HotelAmendmentRequested",
+        "HotelAmendmentApplied",
+        "HotelAmendmentRejected",
+        "HotelChangeRequested",
+        "HotelChangeProgressed",
+        "HotelChangeCompleted",
+        "HotelChangeReviewRequired"
+      ]
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "producer": {
+      "const": "stays"
+    },
+    "mode": {
+      "const": "MOCK"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "payment",
+        "reservation",
+        "refund"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "CREATED",
+            "ACCEPTED",
+            "PROCESSING",
+            "CONFIRMED",
+            "FAILED",
+            "CANCELLATION_PENDING",
+            "CANCELLED",
+            "REVIEW"
+          ]
+        },
+        "payment": {
+          "enum": [
+            "N/A",
+            "NOT_STARTED",
+            "AUTHORIZED",
+            "CAPTURED",
+            "DECLINED",
+            "VOIDED",
+            "DEFERRED"
+          ]
+        },
+        "reservation": {
+          "enum": [
+            "N/A",
+            "NOT_STARTED",
+            "CONFIRMED",
+            "REJECTED",
+            "CANCELLED"
+          ]
+        },
+        "refund": {
+          "enum": [
+            "N/A",
+            "NONE",
+            "PENDING",
+            "SUCCEEDED",
+            "NOT_DUE"
+          ]
+        }
+      }
+    }
+  }
+}

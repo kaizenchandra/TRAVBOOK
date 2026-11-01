@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:travbook:events:checkout:v1",
+  "title": "MOCK checkout lifecycle (durable outbox, publication pending)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "aggregateId",
+    "aggregateVersion",
+    "occurredAt",
+    "correlationId",
+    "causationId",
+    "producer",
+    "mode",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "CheckoutStateRecorded"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "producer": {
+      "const": "booking"
+    },
+    "mode": {
+      "const": "MOCK"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bookingId",
+        "status",
+        "step",
+        "payment",
+        "reservation",
+        "failureCode"
+      ],
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "RUNNING",
+            "CONFIRMED",
+            "FAILED",
+            "REVIEW"
+          ]
+        },
+        "step": {
+          "type": "string",
+          "enum": [
+            "REVALIDATE",
+            "AUTHORIZE",
+            "RESERVE",
+            "CAPTURE",
+            "CANCEL",
+            "VOID",
+            "DONE"
+          ]
+        },
+        "payment": {
+          "type": "string",
+          "enum": [
+            "NOT_STARTED",
+            "AUTHORIZED",
+            "CAPTURED",
+            "DECLINED",
+            "VOIDED",
+            "UNKNOWN"
+          ]
+        },
+        "reservation": {
+          "type": "string",
+          "enum": [
+            "NOT_REQUESTED",
+            "CONFIRMED",
+            "REJECTED",
+            "CANCELLED",
+            "UNKNOWN"
+          ]
+        },
+        "failureCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

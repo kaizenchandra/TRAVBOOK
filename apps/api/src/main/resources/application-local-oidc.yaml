@@ -1,0 +1,25 @@
+# Explicit loopback development profile only. Never use these settings for deployment.
+travbook:
+  login-enabled: true
+  local-identity: true
+  oidc-issuer: http://127.0.0.1:8180/realms/travbook
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          travbook:
+            provider: travbook
+            client-id: travbook-web
+            client-authentication-method: none
+            authorization-grant-type: authorization_code
+            redirect-uri: ${travbook.web-origin}/login/oauth2/code/travbook
+            scope: openid,quotes:read,quotes:write,bookings:read,bookings:write
+        provider:
+          travbook:
+            issuer-uri: ${travbook.oidc-issuer}
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false

@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Travbook: API",
+			"type": "shell",
+			"command": "sh scripts/maven.sh -f apps/api/pom.xml spring-boot:run -Dspring-boot.run.profiles=local-oidc",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Travbook: Web",
+			"type": "shell",
+			"command": "npm run dev",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

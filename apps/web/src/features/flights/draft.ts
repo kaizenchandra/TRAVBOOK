@@ -1,0 +1,5 @@
+import type {SearchRequest} from '@/lib/api/client';
+const KEY='travbook-flight-draft-v1';
+/** Only non-personal search criteria are stored; never travellers, identity or prices. */
+export function loadFlightDraft():SearchRequest|null{try{const raw=sessionStorage.getItem(KEY);if(!raw)return null;const x=JSON.parse(raw);if(typeof x.origin!=='string'||!/^[A-Z]{3}$/.test(x.origin)||typeof x.destination!=='string'||!/^[A-Z]{3}$/.test(x.destination)||!/^\d{4}-\d{2}-\d{2}$/.test(x.departureDate)||x.returnDate!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(x.returnDate)||!['ECONOMY','PREMIUM_ECONOMY','BUSINESS','FIRST'].includes(x.cabin)||!['adults','children','infants'].every(k=>Number.isInteger(x[k])&&x[k]>=0&&x[k]<=9))return null;return {origin:x.origin,destination:x.destination,departureDate:x.departureDate,returnDate:x.returnDate,adults:x.adults,children:x.children,infants:x.infants,cabin:x.cabin};}catch{return null;}}
+export function saveFlightDraft(form:SearchRequest){try{sessionStorage.setItem(KEY,JSON.stringify(form));}catch{/* Session storage can be unavailable; the current form stays usable. */}}

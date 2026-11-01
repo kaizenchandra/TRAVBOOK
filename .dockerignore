@@ -1,0 +1,30 @@
+**/node_modules
+**/.next
+**/target
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/.env*
+**/*.pem
+**/*.key
+.git
+.tools
+.vscode
+.DS_Store
+docs
+*.MD
+*.md
+
+# Keep local database backups and diagnostics out of application images.
+**/*.log
+**/*.dump
+**/*.backup
+**/.DS_Store
+# Infrastructure state/provider caches never belong in application images.
+infra
+**/*.tfstate*
+**/*.tfplan
+**/*.tfvars
+
+# Public AWS RDS CA bundle is deliberately included; other PEM/key files stay excluded.
+!deploy/certificates/rds-global-bundle.pem

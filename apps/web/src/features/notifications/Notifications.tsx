@@ -1,0 +1,16 @@
+"use client";
+import Link from 'next/link';
+import {useState} from 'react';
+import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
+import {api,unwrap} from '@/lib/api/client';
+import {OwnedArea,useOwnedGuard} from '@/features/account/OwnedArea';
+import {csrfHeaders} from '@/features/account/hooks';
+import {Loading,ErrorNotice} from '@/components/Feedback';
+export function NotificationPage(){return <main id="main" className="container detail-page"><header className="detail-title"><div className="eyebrow">YOUR TRAVEL UPDATES</div><h1>Notifications</h1><p>Booking, payment and refund updates. Email/SMS receipts are simulated; no external messages are sent.</p><Link className="back-link" href="/account/travel">Manage notification preferences</Link></header><OwnedArea returnTo="/notifications">{owner=><Inbox owner={owner}/>}</OwnedArea></main>;}
+function Inbox({owner}:{owner:string}){const [after,setAfter]=useState<string|null>(null),guard=useOwnedGuard(owner),cache=useQueryClient();
+ const query=useQuery({queryKey:['notifications',owner,after],gcTime:0,retry:false,refetchIntervalInBackground:false,refetchInterval:q=>q.state.dataUpdateCount<12&&!q.state.error?10000:false,queryFn:()=>guard(async()=>unwrap(await api.GET('/api/v1/me/notifications',{params:{query:after?{after}:{}}})),v=>v.customerId)});
+ const read=useMutation({retry:false,mutationFn:(id:string)=>guard(async()=>unwrap(await api.PUT('/api/v1/me/notifications/{id}/read',{params:{path:{id}},headers:await csrfHeaders()})),v=>v.owner),onSuccess:()=>cache.invalidateQueries({queryKey:['notifications',owner]})});
+ return <><section className="panel"><button className="button secondary" disabled={query.isFetching} onClick={()=>query.refetch()}>Refresh notifications</button><p>Updates refresh for up to two minutes while this page is visible. Historical notices describe the event at that time; open the booking for current status.</p>{query.isPending&&<Loading/>}{query.isError&&<ErrorNotice error={query.error} retry={()=>query.refetch()}/>}{read.isError&&<ErrorNotice error={read.error}/>}</section>
+ {query.data&&!query.isError&&<>{query.data.items.length===0&&<section className="panel"><h2>No notifications yet</h2><p>Your next booking update will appear here after the event is processed.</p></section>}{query.data.items.map(n=><article className="panel" key={n.id}><span className="tag">{n.readAt?'READ':'UNREAD'} · MOCK</span><h2>{n.title}</h2><p>{n.body}</p><p><time dateTime={n.occurredAt}>{new Date(n.occurredAt).toLocaleString()}</time> · Template v{n.templateVersion}</p>{n.deliveries.length>0&&<ul>{n.deliveries.map(d=><li key={d.id}>{d.channel} · {d.state.replaceAll('_',' ')} · Attempts {d.attempts}/3{d.reference&&<span> · {d.reference}</span>}</li>)}</ul>}<div className="profile-actions"><Link className="button primary" href={n.route}>Open related booking</Link>{!n.readAt&&<button className="button secondary" disabled={read.isPending} onClick={()=>read.mutate(n.id)}>Mark as read</button>}</div></article>)}<div className="profile-actions">{after&&<button className="button secondary" onClick={()=>setAfter(null)}>Newest notifications</button>}{query.data.next&&<button className="button secondary" onClick={()=>setAfter(query.data!.next)}>Older notifications</button>}</div></>}
+ </>;
+}

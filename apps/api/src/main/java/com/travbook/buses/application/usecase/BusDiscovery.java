@@ -1,0 +1,20 @@
+package com.travbook.buses.application.usecase;
+import com.travbook.buses.application.port.in.DiscoverBuses;
+import com.travbook.buses.application.port.out.BusSupplier;
+import com.travbook.buses.domain.model.Bus;
+import com.travbook.buses.domain.model.Bus.*;
+import com.travbook.shared.domain.*;
+import com.travbook.shared.application.port.out.SnapshotStore;
+import java.time.*;
+import java.util.*;
+public final class BusDiscovery implements DiscoverBuses{
+ private final SnapshotStore<Snapshot> store;private final BusSupplier supplier;private final Clock clock;private final com.travbook.buses.application.port.in.BusInventory inventory;
+ public BusDiscovery(SnapshotStore<Snapshot> store,BusSupplier supplier,Clock clock,com.travbook.buses.application.port.in.BusInventory inventory){this.store=store;this.supplier=supplier;this.clock=clock;this.inventory=inventory;}
+ public Page search(Criteria criteria){criteria.valid(clock);var now=clock.instant();var data=supplier.search(criteria,now);if(data.coverage().stream().noneMatch(c->c.status()==SupplierCoverage.Status.AVAILABLE))throw new DomainFailure(DomainFailure.Code.SUPPLIERS_UNAVAILABLE,"All bus providers are unavailable. This is not a sold-out result.");var expiry=data.trips().stream().map(t->t.departureAt()).min((a,b)->a.compareTo(b)).filter(t->t.isBefore(now.plusSeconds(600))).orElse(now.plusSeconds(600));var snapshot=new Snapshot(UUID.randomUUID(),criteria,data.trips(),data.coverage(),now,expiry,"MOCK");store.save(snapshot);return filtered(snapshot,Filter.defaults());}
+ private Snapshot snapshot(UUID id){var s=store.find(id).orElseThrow(()->new DomainFailure(DomainFailure.Code.NOT_FOUND,"Bus search not found."));s.fresh(clock.instant());return s;}
+ public Page page(UUID id,Filter f){return filtered(snapshot(id),f);}
+ private Page filtered(Snapshot s,Filter f){var list=s.trips().stream().filter(t->f.operator().isEmpty()||t.supplier().equals(f.operator())).filter(t->f.type()==TypeFilter.ALL||t.type().name().equals(f.type().name())).filter(t->f.ac()==AcFilter.ALL||t.ac()==(f.ac()==AcFilter.AC)).filter(t->f.boarding().isEmpty()||t.boarding().stream().anyMatch(p->p.id().equals(f.boarding()))).filter(t->t.minimumFare().decimal().compareTo(f.maxFare())<=0).filter(t->{int h=t.departureAt().atZone(ZoneId.of(t.timezone())).getHour();return f.period()==Bus.Period.ALL||f.period()==Bus.Period.MORNING&&h<12||f.period()==Bus.Period.EVENING&&h>=12&&h<21||f.period()==Bus.Period.NIGHT&&h>=21;}).sorted(switch(f.sort()){case PRICE->Comparator.comparing(t->t.minimumFare().decimal());case DEPARTURE->Comparator.comparing(t->t.departureAt());case DURATION->Comparator.comparingInt(t->t.durationMinutes());case RATING->Comparator.<Trip,String>comparing(t->t.rating()).reversed();}).toList();return new Page(s.id(),s.criteria(),list.stream().skip((long)f.page()*f.size()).limit(f.size()).toList(),s.coverage(),s.createdAt(),s.expiresAt(),"MOCK",list.size(),f.page(),f.size());}
+ public Detail trip(UUID search,UUID id,boolean fresh){var s=snapshot(search);var trip=s.trip(id);return new Detail(search,s.criteria(),availability(fresh?supplier.fresh(trip,clock.instant()):trip),clock.instant(),s.expiresAt(),"MOCK");}
+ private Trip availability(Trip t){var unavailable=inventory.unavailable(t.supplier(),t.id(),clock.instant());var seats=t.seats().stream().map(s->unavailable.contains(s.id())?new Seat(s.id(),s.deck(),s.row(),s.column(),s.type(),SeatStatus.OCCUPIED,s.minimumAge(),s.fare()):s).toList();return new Trip(t.id(),t.supplier(),t.operator(),t.origin(),t.destination(),t.departureAt(),t.arrivalAt(),t.timezone(),t.durationMinutes(),t.type(),t.ac(),t.rating(),t.amenities(),t.cancellationPolicy(),t.instructions(),t.boarding(),t.dropping(),seats,t.minimumFare());}
+ public FareCheck reprice(UUID search,UUID id,List<String> seats,String boarding,String dropping){var s=snapshot(search);var original=s.trip(id);var current=availability(supplier.fresh(original,clock.instant()));s.fresh(clock.instant());return Bus.fare(s,original,current,seats,boarding,dropping,clock.instant());}
+}
